@@ -2,6 +2,7 @@ require 'sinatra'
 require 'sinatra/reloader' if development?
 require 'json'
 require 'ruby_llm'
+require_relative 'llm'
 
 RubyLLM.configure do |config|
   config.openai_api_key = ENV["OPENAI_API_KEY"]
@@ -26,6 +27,47 @@ configure :production do
     "127.0.0.1",
     "localhost"
   ]
+end
+
+class ChatApp
+  def initialize
+    @history = []
+  end
+
+  def add_to_history(role:, content:, timestamp: Time.now.strftime("%H:%M"))
+    @history << { role: role, content: content, timestamp: timestamp }
+  end
+
+  def history
+    @history.dup
+  end
+
+  def clear_history
+    @history.clear
+  end
+
+  def save_conversation(filename = "chat_history.json")
+    require 'json'
+    File.write(filename, JSON.pretty_generate(@history))
+    true
+  end
+
+  def load_conversation(filename = "chat_history.json")
+    require 'json'
+    if File.exist?(filename)
+      @history = JSON.parse(File.read(filename), symbolize_names: true)
+      true
+    else
+      false
+    end
+  end
+
+  def ask(input)
+    response = LLMClient.ask(input)
+    add_to_history(role: :user, content: input)
+    add_to_history(role: :assistant, content: response.content)
+    response
+  end
 end
 
 get '/' do

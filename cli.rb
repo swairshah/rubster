@@ -14,6 +14,46 @@ gemfile do
   gem 'ruby_llm'
 end
 
+require_relative 'llm'
+
+class ChatApp
+  def initialize
+    @history = []
+  end
+
+  def add_to_history(role:, content:, timestamp: Time.now.strftime("%H:%M"))
+    @history << { role: role, content: content, timestamp: timestamp }
+  end
+
+  def history
+    @history.dup
+  end
+
+  def clear_history
+    @history.clear
+  end
+
+  def ask(input)
+    LLMClient.ask(input)
+  end
+
+  def save_conversation(filename = "chat_history.json")
+    require 'json'
+    File.write(filename, JSON.pretty_generate(@history))
+    true
+  end
+
+  def load_conversation(filename = "chat_history.json")
+    require 'json'
+    if File.exist?(filename)
+      @history = JSON.parse(File.read(filename), symbolize_names: true)
+      true
+    else
+      false
+    end
+  end
+end
+
 class CliChat
   THEMES = {
     user: {
@@ -33,8 +73,8 @@ class CliChat
   def initialize
     @pastel = Pastel.new
     @prompt = TTY::Prompt.new
-    @history = []
     @cursor = TTY::Cursor
+    @app = ChatApp.new
     setup_llm
   end
 
@@ -44,11 +84,8 @@ class CliChat
       key = @prompt.mask("Please enter your OpenAI API key:")
       ENV['OPENAI_API_KEY'] = key
     end
-
-    RubyLLM.configure do |config|
-      config.openai_api_key = ENV["OPENAI_API_KEY"]
-    end
-    @chat_client = RubyLLM.chat
+    
+    LLMClient.setup
   end
 
   def display_message(role:, content:, timestamp: Time.now.strftime("%H:%M"))
@@ -58,7 +95,7 @@ class CliChat
     if role == :assistant
       puts "\n#{theme[:prefix]} #{@pastel.send(theme[:color], 'Assistant')} (#{timestamp})"
       puts "#{content}\n"
-      @history << { role: role, content: content, timestamp: timestamp }
+      @app.add_to_history(role: role, content: content, timestamp: timestamp)
       return
     end
     
@@ -79,7 +116,7 @@ class CliChat
     end
 
     puts box
-    @history << { role: role, content: content, timestamp: timestamp }
+    @app.add_to_history(role: role, content: content, timestamp: timestamp)
   end
 
   def get_input
@@ -112,18 +149,18 @@ class CliChat
   end
 
   def save_conversation(filename = "chat_history.json")
-    File.write(filename, JSON.pretty_generate(@history))
-    display_message(
-      role: :system,
-      content: "✅ Conversation saved to #{filename}"
-    )
+    if @app.save_conversation(filename)
+      display_message(
+        role: :system,
+        content: "✅ Conversation saved to #{filename}"
+      )
+    end
   end
 
   def load_conversation(filename = "chat_history.json")
-    if File.exist?(filename)
-      @history = JSON.parse(File.read(filename), symbolize_names: true)
+    if @app.load_conversation(filename)
       clear_screen
-      @history.each do |msg|
+      @app.history.each do |msg|
         display_message(**msg)
       end
       display_message(
@@ -156,7 +193,7 @@ class CliChat
       puts @pastel.yellow("\n 👋")
       exit
     when '/clear'
-      @history.clear
+      @app.clear_history
       clear_screen
       display_welcome
     when '/help'
@@ -178,22 +215,14 @@ class CliChat
       input = get_input
       next if handle_command(input)
 
-      # display_message(role: :user, content: input)
-      
-      # print "#{THEMES[:assistant][:prefix]}"  
-
       begin
         spinner = TTY::Spinner.new(":spinner", format: :dots)
         spinner.auto_spin
-        response = @chat_client.ask(input)
-        # print @cursor.clear_line         # Clear the spinner line
+        response = @app.ask(input)
         spinner.stop
-        # print @cursor.column(0)          # Move cursor to beginning of line
         display_message(role: :assistant, content: response.content)
       rescue => e
         spinner.stop
-        print @cursor.clear_line         # Clear the spinner line
-        print @cursor.column(0)          # Move cursor to beginning of line
         display_message(
           role: :system,
           content: "❌ Error: #{e.message}"
@@ -203,5 +232,6 @@ class CliChat
   end
 end
 
-# Start the chat interface
-CliChat.new.start_chat 
+if __FILE__ == $0
+  CliChat.new.start_chat
+end 
