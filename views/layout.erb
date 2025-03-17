@@ -1,0 +1,17 @@
+<!-- views/layout.erb -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat with AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Load Alpine.js FIRST (without defer) -->
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Then load your app.js -->
+  <script src="/js/app.js"></script>
+</head>
+<body class="bg-gray-50">
+  <%= yield %>
+</body>
+</html>

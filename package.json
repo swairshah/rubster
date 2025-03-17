@@ -1,0 +1,22 @@
+{
+   "name": "rubster",
+   "version": "1.0.0",
+   "main": "index.js",
+   "scripts": {
+      "build": "tsc",
+      "watch": "tsc --watch",
+      "dev": "concurrently \"nodemon --watch 'src/**/*' --ext 'ts,tsx' --exec 'npm run build'\" \"bundle exec ruby app.rb\"",
+      "start": "bundle exec ruby app.rb"
+   },
+   "keywords": [],
+   "author": "",
+   "license": "ISC",
+   "description": "",
+   "devDependencies": {
+      "@types/alpinejs": "^3.13.11",
+      "alpinejs": "^3.14.9",
+      "concurrently": "^9.1.2",
+      "nodemon": "^3.1.9",
+      "typescript": "^5.8.2"
+   }
+}
